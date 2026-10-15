@@ -350,6 +350,8 @@ def send_message(self, message: str):
 
 ## 🛠️ 开发指南
 
+编码 Agent 请先阅读 [统一工作约定（MONO 人设与更新公告）](./AGENTS.md)。全部开发、使用及远程管理文档见 [文档索引](./docs/README.md)。
+
 ### 创建新实例
 
 1. 在 `instances/` 目录创建新文件
