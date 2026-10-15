@@ -644,6 +644,8 @@ class SteamAuto(BaseInstance):
                     url = news.get('url', '#')
                     contents = self._clean_cs2_news_contents(news.get('contents', '无摘要'))
                     title, contents, translated = self._translate_cs2_news(title, contents)
+                    title = self._clean_cs2_news_contents(title)
+                    contents = self._clean_cs2_news_contents(contents)
 
                     # 构建消息
                     message = f"【CS2 更新】\n\n"
@@ -681,6 +683,7 @@ class SteamAuto(BaseInstance):
         text = re.sub(r'<\s*br\s*/?\s*>', '\n', text, flags=re.IGNORECASE)
         text = re.sub(r'<\s*/\s*p\s*>', '\n\n', text, flags=re.IGNORECASE)
         text = re.sub(r'<\s*p(?:\s+[^>]*)?>', '', text, flags=re.IGNORECASE)
+        text = re.sub(r'<\s*/?\s*(?:h[1-6]|div)(?:\s+[^>]*)?>', '\n\n', text, flags=re.IGNORECASE)
         text = re.sub(
             r'<a\s+[^>]*href=["\']([^"\']+)["\'][^>]*>(.*?)</a>',
             r'\2 (\1)',
@@ -699,6 +702,10 @@ class SteamAuto(BaseInstance):
         text = re.sub(r'<\s*/\s*li\s*>', '\n', text, flags=re.IGNORECASE)
         text = re.sub(r'\[url=([^\]]+)\](.*?)\[/url\]', r'\2 (\1)', text, flags=re.IGNORECASE | re.DOTALL)
         text = re.sub(r'\[img\](.*?)\[/img\]', r'\n图片：\1', text, flags=re.IGNORECASE | re.DOTALL)
+        text = re.sub(r'\[/?(?:h[1-6]|p)(?:=[^\]]*)?\]', '\n\n', text, flags=re.IGNORECASE)
+        text = re.sub(r'\[/?(?:list|olist)(?:=[^\]]*)?\]', '\n', text, flags=re.IGNORECASE)
+        text = re.sub(r'\[\*\][ \t]*', '\n- ', text)
+        text = re.sub(r'\[/\*\]', '', text)
         text = re.sub(r'\[/?[a-z][^\]]*\]', '', text, flags=re.IGNORECASE)
         text = re.sub(r'<[^>]+>', '', text)
         text = html.unescape(text)

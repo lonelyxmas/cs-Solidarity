@@ -140,6 +140,20 @@ class SteamNewsTranslationTests(unittest.TestCase):
         self.assertTrue(all(len(chunk) <= 1800 for chunk in chunks))
         self.assertEqual("".join(chunks), source)
 
+    def test_preserves_compact_steam_headings_and_list_items(self):
+        source = (
+            '[h2][ UI ][/h2][p]演示/回放查看器改进：[/p]'
+            '[list][*]下载进度条[/*][*]点击并拖拽[/*][/list]'
+            '<h2>[ 杂项 ]</h2><ul><li>回合备份启动标志</li>'
+            '<li>AUG 换弹动画</li></ul>'
+        )
+
+        self.assertEqual(
+            self.instance._clean_cs2_news_contents(source),
+            '[ UI ]\n\n演示/回放查看器改进：\n\n- 下载进度条\n- 点击并拖拽'
+            '\n\n[ 杂项 ]\n\n- 回合备份启动标志\n- AUG 换弹动画',
+        )
+
 
 class SteamNewsDeliveryTests(unittest.TestCase):
     def test_sends_translated_full_news_and_only_then_caches_gid(self):
@@ -156,7 +170,9 @@ class SteamNewsDeliveryTests(unittest.TestCase):
         instance._clean_news_cache = Mock()
         instance._trim_news_cache = Mock()
         instance.save_news_cache = Mock()
-        instance._translate_cs2_news = Mock(return_value=("中文标题", "完整中文正文。", True))
+        instance._translate_cs2_news = Mock(return_value=(
+            "中文标题", "[h2][ UI ][/h2][list][*]完整中文正文。[/*][/list]", True,
+        ))
         sent = []
         instance.send_message = sent.append
 
@@ -165,6 +181,8 @@ class SteamNewsDeliveryTests(unittest.TestCase):
         instance._translate_cs2_news.assert_called_once_with("English title", "Full English body.")
         self.assertIn("中文标题", "".join(sent))
         self.assertIn("完整中文正文。", "".join(sent))
+        self.assertIn("[ UI ]\n\n- 完整中文正文。", "".join(sent))
+        self.assertNotIn("[*]", "".join(sent))
         self.assertNotIn("Full English body.", "".join(sent))
         self.assertIn("new", instance.cached_news_gids)
         instance.save_news_cache.assert_called_once_with()
