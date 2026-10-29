@@ -679,7 +679,8 @@ class SteamAuto(BaseInstance):
     @staticmethod
     def _clean_cs2_news_contents(contents):
         """把 Steam 新闻中的 HTML/BBCode 转成适合微信发送的纯文本。"""
-        text = str(contents or '')
+        text = str(contents or '').replace('\r\n', '\n').replace('\r', '\n')
+        text = re.sub(r'\\([\[\]])', r'\1', text)
         text = re.sub(r'<\s*br\s*/?\s*>', '\n', text, flags=re.IGNORECASE)
         text = re.sub(r'<\s*/\s*p\s*>', '\n\n', text, flags=re.IGNORECASE)
         text = re.sub(r'<\s*p(?:\s+[^>]*)?>', '', text, flags=re.IGNORECASE)
@@ -698,19 +699,27 @@ class SteamAuto(BaseInstance):
         )
         text = re.sub(r'<\s*(?:ul|ol)(?:\s+[^>]*)?>', '\n', text, flags=re.IGNORECASE)
         text = re.sub(r'<\s*/\s*(?:ul|ol)\s*>', '\n', text, flags=re.IGNORECASE)
-        text = re.sub(r'<\s*li(?:\s+[^>]*)?>', '- ', text, flags=re.IGNORECASE)
+        text = re.sub(r'<\s*li(?:\s+[^>]*)?>', '\n• ', text, flags=re.IGNORECASE)
         text = re.sub(r'<\s*/\s*li\s*>', '\n', text, flags=re.IGNORECASE)
         text = re.sub(r'\[url=([^\]]+)\](.*?)\[/url\]', r'\2 (\1)', text, flags=re.IGNORECASE | re.DOTALL)
         text = re.sub(r'\[img\](.*?)\[/img\]', r'\n图片：\1', text, flags=re.IGNORECASE | re.DOTALL)
         text = re.sub(r'\[/?(?:h[1-6]|p)(?:=[^\]]*)?\]', '\n\n', text, flags=re.IGNORECASE)
         text = re.sub(r'\[/?(?:list|olist)(?:=[^\]]*)?\]', '\n', text, flags=re.IGNORECASE)
-        text = re.sub(r'\[\*\][ \t]*', '\n- ', text)
+        text = re.sub(r'\[\*\][ \t]*', '\n• ', text)
         text = re.sub(r'\[/\*\]', '', text)
         text = re.sub(r'\[/?[a-z][^\]]*\]', '', text, flags=re.IGNORECASE)
         text = re.sub(r'<[^>]+>', '', text)
         text = html.unescape(text)
         text = re.sub(r'[ \t]+\n', '\n', text)
         text = re.sub(r'\n[ \t]+', '\n', text)
+        # 列表项内的 <p> 或翻译输出可能把项目符号与正文拆开。
+        text = re.sub(r'(?m)^[-*•]\n(?:[ \t]*\n)*[ \t]*(?=[^\s\-*•\[【])', '• ', text)
+        text = re.sub(r'(?m)^[-*•][ \t]+(?=\S)', '• ', text)
+        text = re.sub(r'(?m)^[-*•][ \t]*$', '', text)
+        text = re.sub(r'(?m)^\[([^\[\]\n]+)\]$', lambda m: f'【{m[1].strip()}】', text)
+        text = re.sub(r'(?m)^(【[^【】\n]+】)$', r'\n\n\1', text)
+        text = re.sub(r'(?m)^(【[^【】\n]+】)\n(?:[ \t]*\n)+', r'\1\n', text)
+        text = re.sub(r'\n(?:[ \t]*\n)+(?=• )', '\n', text)
         text = re.sub(r'\n{3,}', '\n\n', text)
         return text.strip()
 
@@ -754,6 +763,9 @@ class SteamAuto(BaseInstance):
                         'content': (
                             '你是专业的游戏更新公告翻译。把输入的英文标题和正文完整翻译成简体中文，'
                             '不得摘要、删减或补充内容；保留段落、项目符号、专有名词、数字和 URL。'
+                            '正文用于微信纯文本消息，不使用 Markdown 或反斜杠转义。'
+                            '分类标题用【标题】，每条列表项用“• 内容”，符号和内容放在同一行，'
+                            '列表项之间不留空行，分类之间留一个空行。'
                             '只返回 JSON 对象，字段名必须是 title 和 contents。'
                         ),
                     },

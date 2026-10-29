@@ -128,7 +128,7 @@ class SteamNewsTranslationTests(unittest.TestCase):
         self.assertEqual(
             result,
             "Fixes & changes\n\nImportant: details (https://example.com)\n"
-            "- HTML link (https://html.example)\n\n图片：https://example.com/image.png",
+            "• HTML link (https://html.example)\n\n图片：https://example.com/image.png",
         )
 
     def test_splits_long_messages_without_losing_content(self):
@@ -150,9 +150,36 @@ class SteamNewsTranslationTests(unittest.TestCase):
 
         self.assertEqual(
             self.instance._clean_cs2_news_contents(source),
-            '[ UI ]\n\n演示/回放查看器改进：\n\n- 下载进度条\n- 点击并拖拽'
-            '\n\n[ 杂项 ]\n\n- 回合备份启动标志\n- AUG 换弹动画',
+            '【UI】\n演示/回放查看器改进：\n• 下载进度条\n• 点击并拖拽'
+            '\n\n【杂项】\n• 回合备份启动标志\n• AUG 换弹动画',
         )
+
+    def test_joins_bullets_split_by_html_paragraphs(self):
+        source = (
+            '<h2>[ 游戏玩法 ]</h2><ul><li><p>新增静音换弹选项。</p></li>'
+            '<li><p>修复换弹声音。</p></li></ul>'
+            '[h2][ 杂项 ][/h2][list][*][p]修复 AMD 显卡渲染。[/*][/p][/list]'
+        )
+
+        self.assertEqual(
+            self.instance._clean_cs2_news_contents(source),
+            '【游戏玩法】\n• 新增静音换弹选项。\n• 修复换弹声音。'
+            '\n\n【杂项】\n• 修复 AMD 显卡渲染。',
+        )
+
+    def test_normalizes_translated_plain_text_for_wechat(self):
+        source = (
+            '\\[ 游戏玩法 ]\r\n\r\n-\r\n\r\n新增静音换弹选项。'
+            '\r\n\r\n-\r\n\r\n修复换弹声音。'
+            '\r\n\r\n\\[ 杂项 \\]\r\n\r\n- 修复 AMD 显卡渲染。'
+        )
+        expected = (
+            '【游戏玩法】\n• 新增静音换弹选项。\n• 修复换弹声音。'
+            '\n\n【杂项】\n• 修复 AMD 显卡渲染。'
+        )
+
+        self.assertEqual(self.instance._clean_cs2_news_contents(source), expected)
+        self.assertEqual(self.instance._clean_cs2_news_contents(expected), expected)
 
 
 class SteamNewsDeliveryTests(unittest.TestCase):
@@ -171,7 +198,7 @@ class SteamNewsDeliveryTests(unittest.TestCase):
         instance._trim_news_cache = Mock()
         instance.save_news_cache = Mock()
         instance._translate_cs2_news = Mock(return_value=(
-            "中文标题", "[h2][ UI ][/h2][list][*]完整中文正文。[/*][/list]", True,
+            "中文标题", "\\[ UI ]\n\n-\n\n完整中文正文。", True,
         ))
         sent = []
         instance.send_message = sent.append
@@ -181,7 +208,7 @@ class SteamNewsDeliveryTests(unittest.TestCase):
         instance._translate_cs2_news.assert_called_once_with("English title", "Full English body.")
         self.assertIn("中文标题", "".join(sent))
         self.assertIn("完整中文正文。", "".join(sent))
-        self.assertIn("[ UI ]\n\n- 完整中文正文。", "".join(sent))
+        self.assertIn("【UI】\n• 完整中文正文。", "".join(sent))
         self.assertNotIn("[*]", "".join(sent))
         self.assertNotIn("Full English body.", "".join(sent))
         self.assertIn("new", instance.cached_news_gids)
